@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.media.projection.MediaProjectionManager;
+import android.media.projection.MediaProjectionConfig;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.os.Build;
 
 import androidx.core.util.Consumer;
 
@@ -16,6 +18,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
@@ -59,6 +62,7 @@ class GetUserMediaImpl {
 
     private Promise displayMediaPromise;
     private Intent mediaProjectionPermissionResultData;
+    private ReadableMap displayMediaConstraints;
 
     GetUserMediaImpl(WebRTCModule webRTCModule, ReactApplicationContext reactContext) {
         this.webRTCModule = webRTCModule;
@@ -264,7 +268,14 @@ class GetUserMediaImpl {
         }
     }
 
-    void getDisplayMedia(Promise promise) {
+    void getDisplayMedia(final ReadableMap constraints, Promise promise) {
+
+        // Handle the incoming params
+        final boolean createConfigForDefaultDisplayParam =
+            constraints.hasKey("createConfigForDefaultDisplay")
+            && (constraints.getType("createConfigForDefaultDisplay") == ReadableType.Boolean)
+            && constraints.getBoolean("createConfigForDefaultDisplay");
+
         if (this.displayMediaPromise != null) {
             promise.reject(new RuntimeException("Another operation is pending."));
             return;
@@ -277,6 +288,7 @@ class GetUserMediaImpl {
         }
 
         this.displayMediaPromise = promise;
+        this.displayMediaConstraints = constraints;
 
         MediaProjectionManager mediaProjectionManager =
                 (MediaProjectionManager) currentActivity.getApplication().getSystemService(
@@ -286,8 +298,17 @@ class GetUserMediaImpl {
             UiThreadUtil.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    currentActivity.startActivityForResult(
+                    if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) &&
+                        createConfigForDefaultDisplayParam == true) {
+                            //MediaProjectionConfig need API level 34
+                            //Return mediaProjection which restricts the user to capturing the default display
+                            currentActivity.startActivityForResult(
+                                mediaProjectionManager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()), PERMISSION_REQUEST_CODE);
+                    } else {
+                        //Return mediaProjection which allows the user to decide which region is captured
+                        currentActivity.startActivityForResult(
                             mediaProjectionManager.createScreenCaptureIntent(), PERMISSION_REQUEST_CODE);
+                    }
                 }
             });
 
@@ -373,6 +394,18 @@ class GetUserMediaImpl {
         DisplayMetrics displayMetrics = DisplayUtils.getDisplayMetrics(reactContext.getCurrentActivity());
         int width = displayMetrics.widthPixels;
         int height = displayMetrics.heightPixels;
+
+        // Handle the displayMediaConstraints params
+        if(displayMediaConstraints.hasKey("video") && (displayMediaConstraints.getType("video") == ReadableType.Map)) {
+            ReadableMap videoConstraintsMap = displayMediaConstraints.getMap("video");
+            if(videoConstraintsMap.hasKey("width")) {
+                width = videoConstraintsMap.getInt("width");
+            }
+            if(videoConstraintsMap.hasKey("height")) {
+                height = videoConstraintsMap.getInt("height");
+            }
+        }
+
         ScreenCaptureController screenCaptureController = new ScreenCaptureController(
                 reactContext.getCurrentActivity(), width, height, mediaProjectionPermissionResultData);
         return createVideoTrack(screenCaptureController);

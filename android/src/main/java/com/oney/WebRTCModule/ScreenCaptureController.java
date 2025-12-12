@@ -24,6 +24,8 @@ public class ScreenCaptureController extends AbstractVideoCaptureController {
     private final OrientationEventListener orientationListener;
 
     private final Context context;
+    private final int savedWidth;
+    private final int savedHeight;
 
     public ScreenCaptureController(Context context, int width, int height, Intent mediaProjectionPermissionResultData) {
         super(width, height, DEFAULT_FPS);
@@ -31,19 +33,26 @@ public class ScreenCaptureController extends AbstractVideoCaptureController {
         this.mediaProjectionPermissionResultData = mediaProjectionPermissionResultData;
 
         this.context = context;
+        this.savedWidth = width;
+        this.savedHeight = height;
 
         this.orientationListener = new OrientationEventListener(context) {
             @Override
             public void onOrientationChanged(int orientation) {
-                DisplayMetrics displayMetrics = DisplayUtils.getDisplayMetrics((Activity) context);
-                final int width = displayMetrics.widthPixels;
-                final int height = displayMetrics.heightPixels;
+
+
+//A voir ici car l'ancien code
+//permet de gérer l'évolution de la taille de l'écran au changement d'orientation
+//TODO vérifier si on récup les bons width et height après rotation écran
+//Il faudrait savoir si les valeurs viennent des contraintes ou non
+
+
 
                 // Pivot to the executor thread because videoCapturer.changeCaptureFormat runs in the main
                 // thread and may deadlock.
                 ThreadUtils.runOnExecutor(() -> {
                     try {
-                        videoCapturer.changeCaptureFormat(width, height, DEFAULT_FPS);
+                        videoCapturer.changeCaptureFormat(savedWidth, savedHeight, DEFAULT_FPS);
                     } catch (Exception ex) {
                         // We ignore exceptions here. The video capturer runs on its own
                         // thread and we cannot synchronize with it.

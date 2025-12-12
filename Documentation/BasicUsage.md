@@ -112,6 +112,21 @@ try {
 };
 ```
 
+### Using Media Constraints on getDisplayMedia
+
+It is possible to use mediaConstraints on getDisplayMedia to set resolution and to restricts the user to capturing the default display using the custom parameter "createConfigForDefaultDisplay".
+
+```javascript
+let mediaConstraints = {
+	audio: false,
+	video: {
+		width: 1280,
+		height: 720
+	},
+	createConfigForDefaultDisplay: true,
+};
+```
+
 ## Destroying the Media Stream
 
 Cycling all of the tracks and stopping them is more than enough to clean up after a call has finished.  
